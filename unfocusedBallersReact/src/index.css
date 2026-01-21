@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-white text-black antialiased overflow-x-hidden;
+  }
+
+  ::selection {
+    @apply bg-black text-white;
+  }
+}
