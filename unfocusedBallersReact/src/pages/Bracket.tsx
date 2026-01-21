@@ -342,19 +342,6 @@ const Bracket = () => {
   };
 
 
-  const bracketTheme = {
-    roundTitle: {
-      background: "transparent",
-      fontColor: "#000000",
-      fontSize: "0.65rem",
-    },
-    connector: {
-      stroke: "rgba(0, 0, 0, 0.15)",
-    },
-    seed: {
-      background: "transparent",
-    },
-  };
 
   return (
     <section className="space-y-10">
@@ -410,12 +397,11 @@ const Bracket = () => {
               <div className="p-4">
                 {/* w-max is the scrollable content width */}
                 <div className="w-max px-6 sm:mx-auto sm:px-0">
-                  <BracketView
-                    rounds={mainRounds}
-                    renderSeedComponent={CustomSeed}
-                    mobileBreakpoint={0}
-                    theme={bracketTheme}
-                  />
+              <BracketView
+                rounds={mainRounds}
+                renderSeedComponent={CustomSeed}
+                mobileBreakpoint={0}
+              />
                 </div>
               </div>
             </div>
@@ -428,12 +414,11 @@ const Bracket = () => {
             <div className="max-w-[100vw] overflow-x-auto overflow-y-visible overscroll-x-contain border border-black/10 bg-white shadow-card">
               <div className="p-4">
                 <div className="w-max px-6 sm:mx-auto sm:px-0">
-                  <BracketView
-                    rounds={thirdPlaceRounds}
-                    renderSeedComponent={CustomSeed}
-                    mobileBreakpoint={0}
-                    theme={bracketTheme}
-                  />
+              <BracketView
+                rounds={thirdPlaceRounds}
+                renderSeedComponent={CustomSeed}
+                mobileBreakpoint={0}
+              />
                 </div>
               </div>
             </div>

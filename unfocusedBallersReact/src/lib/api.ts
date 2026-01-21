@@ -26,19 +26,23 @@ const request = async <T>(path: string, options: ApiOptions = {}) => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${getApiUrl()}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getApiUrl()}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined
+    });
+  } catch {
+    throw new Error("Network error. Please try again.");
+  }
 
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    const message = data?.error || data?.message || "Request failed";
-    throw new Error(message);
+    throw new Error("Network error. Please try again.");
   }
 
   return data as T;

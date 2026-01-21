@@ -44,6 +44,7 @@ const Home = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -84,8 +85,101 @@ const Home = () => {
     return sorted[0];
   }, [tournaments]);
 
+  useEffect(() => {
+    if (!nextTournament?.startTime) {
+      setCountdown(null);
+      return;
+    }
+
+    const start = new Date(nextTournament.startTime);
+    if (Number.isNaN(start.getTime())) {
+      setCountdown(null);
+      return;
+    }
+
+    const tick = () => {
+      const diff = start.getTime() - Date.now();
+      if (diff <= 0) {
+        setCountdown("Kickoff in progress");
+        return;
+      }
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [nextTournament?.startTime]);
+
   return (
     <section className="space-y-12">
+      <div className="grid gap-6 lg:grid-cols-[2fr,3fr]">
+        <div className="space-y-4 border border-black/10 bg-white p-6 shadow-card">
+          <p className="text-xs uppercase tracking-[0.3em] text-black/50">
+            Next Tournament
+          </p>
+          {nextTournament ? (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">
+                {nextTournament.name}
+              </h2>
+              <div className="text-sm text-black/60">
+                <p>{nextTournament.location ?? "Location TBD"}</p>
+                <p>
+                  {formatDate(nextTournament.startTime)} · {formatTime(nextTournament.startTime)}
+                </p>
+              </div>
+              <div className="border border-black/10 bg-white px-4 py-3 text-sm text-black/70">
+                <p className="text-xs uppercase tracking-[0.2em] text-black/50">
+                  Countdown
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {countdown ?? "Countdown unavailable"}
+                </p>
+              </div>
+              <div className="border border-black/10 bg-white px-4 py-3 text-sm text-black/70">
+                {nextTournament.formatSnippet ??
+                  "5-a-side, 4 teams of 5, 30 minute games, single elim + 3rd/4th playoff"}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-black/60">
+              No tournaments are scheduled yet.
+            </p>
+          )}
+        </div>
+        <div className="relative overflow-hidden border border-black/10 bg-black p-6 text-white shadow-card">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),transparent_60%)]" />
+          <div className="relative flex h-full flex-col justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/60">
+                On the Pitch
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+                Clean lines, quick turns, ruthless finishes.
+              </h3>
+            </div>
+            <p className="text-sm text-white/70">
+              Track brackets, roster teams, and celebrate winners in one clean
+              space. Designed to feel like matchday: focused, loud, and fast.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em]">
+                4 Teams
+              </div>
+              <div className="border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em]">
+                Single Elim
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="relative overflow-hidden border border-black/10 bg-white shadow-card">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(77,127,97,0.15),transparent_45%)]" />
         <div className="absolute right-[-10%] top-8 h-40 w-40 rounded-full border border-black/10 opacity-70" />
@@ -147,60 +241,6 @@ const Home = () => {
                 Hero image coming soon
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[2fr,3fr]">
-        <div className="space-y-4 border border-black/10 bg-white p-6 shadow-card">
-          <p className="text-xs uppercase tracking-[0.3em] text-black/50">
-            Next Tournament
-          </p>
-          {nextTournament ? (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight">
-                {nextTournament.name}
-              </h2>
-              <div className="text-sm text-black/60">
-                <p>{nextTournament.location ?? "Location TBD"}</p>
-                <p>
-                  {formatDate(nextTournament.startTime)} · {formatTime(nextTournament.startTime)}
-                </p>
-              </div>
-              <div className="border border-black/10 bg-white px-4 py-3 text-sm text-black/70">
-                {nextTournament.formatSnippet ??
-                  "5-a-side, 4 teams of 5, 30 minute games, single elim + 3rd/4th playoff"}
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-black/60">
-              No tournaments are scheduled yet.
-            </p>
-          )}
-        </div>
-        <div className="relative overflow-hidden border border-black/10 bg-black p-6 text-white shadow-card">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),transparent_60%)]" />
-          <div className="relative flex h-full flex-col justify-between gap-6">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60">
-                On the Pitch
-              </p>
-              <h3 className="mt-3 text-2xl font-semibold tracking-tight">
-                Clean lines, quick turns, ruthless finishes.
-              </h3>
-            </div>
-            <p className="text-sm text-white/70">
-              Track brackets, roster teams, and celebrate winners in one clean
-              space. Designed to feel like matchday: focused, loud, and fast.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em]">
-                4 Teams
-              </div>
-              <div className="border border-white/20 px-3 py-2 text-xs uppercase tracking-[0.3em]">
-                Single Elim
-              </div>
-            </div>
           </div>
         </div>
       </div>

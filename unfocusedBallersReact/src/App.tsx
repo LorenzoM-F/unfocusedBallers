@@ -10,6 +10,7 @@ import Teams from "./pages/Teams";
 import Gallery from "./pages/Gallery";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
+import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminPlayers from "./pages/admin/AdminPlayers";
 import AdminTeams from "./pages/admin/AdminTeams";
@@ -39,42 +40,16 @@ const App = () => {
           path="admin"
           element={
             <AdminRoute>
-              <AdminDashboard />
+              <AdminLayout />
             </AdminRoute>
           }
-        />
-        <Route
-          path="admin/players"
-          element={
-            <AdminRoute>
-              <AdminPlayers />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="admin/teams"
-          element={
-            <AdminRoute>
-              <AdminTeams />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="admin/tournaments"
-          element={
-            <AdminRoute>
-              <AdminTournaments />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="admin/bracket"
-          element={
-            <AdminRoute>
-              <AdminBracket />
-            </AdminRoute>
-          }
-        />
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path="players" element={<AdminPlayers />} />
+          <Route path="teams" element={<AdminTeams />} />
+          <Route path="tournaments" element={<AdminTournaments />} />
+          <Route path="bracket" element={<AdminBracket />} />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

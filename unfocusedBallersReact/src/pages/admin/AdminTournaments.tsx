@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 
 type Tournament = {
@@ -18,14 +18,41 @@ const statusOptions = [
   "COMPLETED"
 ];
 
+const STORAGE_KEY = "adminSelectedTournamentId";
+
+const toIsoWithOffset = (value: string) => {
+  if (!value) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toISOString();
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+};
+
 const AdminTournaments = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [startTime, setStartTime] = useState("");
-  const [selected, setSelected] = useState<Tournament | null>(null);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, Partial<Tournament>>>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const loadTournaments = async () => {
     const data = await api.get<{ tournaments: Tournament[] }>("/admin/tournaments");
@@ -38,7 +65,14 @@ const AdminTournaments = () => {
       .get<{ tournaments: Tournament[] }>("/admin/tournaments")
       .then((data) => {
         if (!active) return;
-        setTournaments(data.tournaments ?? []);
+        const loaded = data.tournaments ?? [];
+        setTournaments(loaded);
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored && loaded.some((t) => t.id === stored)) {
+          setSelectedTournamentId(stored);
+        } else if (loaded[0]) {
+          setSelectedTournamentId(loaded[0].id);
+        }
       })
       .catch(() => {
         if (!active) return;
@@ -57,11 +91,16 @@ const AdminTournaments = () => {
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setFormError(null);
+    if (!name.trim()) {
+      setFormError("Tournament name is required.");
+      return;
+    }
     try {
       await api.post("/admin/tournaments", {
-        name,
+        name: name.trim(),
         location: location || undefined,
-        startTime: startTime || undefined
+        startTime: startTime ? toIsoWithOffset(startTime) : undefined
       });
       setName("");
       setLocation("");
@@ -72,27 +111,87 @@ const AdminTournaments = () => {
     }
   };
 
-  const handleUpdate = async () => {
-    if (!selected) return;
+  const handleStatusChange = async (id: string, status: string) => {
     setError(null);
     try {
-      await api.patch(`/admin/tournaments/${selected.id}`, {
-        name: selected.name,
-        location: selected.location,
-        startTime: selected.startTime,
-        status: selected.status
+      await api.patch(`/admin/tournaments/${id}`, { status });
+      await loadTournaments();
+    } catch {
+      setError("We couldn't update the tournament status. Please try again.");
+    }
+  };
+
+  const handleEditToggle = (tournament: Tournament) => {
+    setEditingId(tournament.id);
+    setEditValues((prev) => ({
+      ...prev,
+      [tournament.id]: {
+        name: tournament.name,
+        location: tournament.location,
+        startTime: tournament.startTime
+      }
+    }));
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    const payload = editValues[id];
+    if (!payload) return;
+    setError(null);
+    try {
+      await api.patch(`/admin/tournaments/${id}`, {
+        ...payload,
+        startTime: payload.startTime ? toIsoWithOffset(payload.startTime) : payload.startTime
       });
+      setEditingId(null);
       await loadTournaments();
     } catch {
       setError("We couldn't update the tournament. Please try again.");
     }
   };
 
+  const handleSelectTournament = (value: string) => {
+    setSelectedTournamentId(value);
+    if (value) {
+      localStorage.setItem(STORAGE_KEY, value);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
+  const selectedTournament = useMemo(() => {
+    return tournaments.find((tournament) => tournament.id === selectedTournamentId);
+  }, [tournaments, selectedTournamentId]);
+
   return (
     <section className="space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.3em] text-black/50">Admin</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Tournaments</h1>
+      </div>
+
+      <div className="border border-black/10 bg-white p-6 shadow-card">
+        <p className="text-xs uppercase tracking-[0.3em] text-black/50">
+          Selected Tournament
+        </p>
+        <div className="mt-4 max-w-sm">
+          <select
+            value={selectedTournamentId}
+            onChange={(event) => handleSelectTournament(event.target.value)}
+            className="w-full border border-black/10 bg-white px-3 py-2 text-sm shadow-card"
+          >
+            <option value="">Select tournament</option>
+            {tournaments.map((tournament) => (
+              <option key={tournament.id} value={tournament.id}>
+                {tournament.name}
+              </option>
+            ))}
+          </select>
+          {selectedTournament && (
+            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-black/50">
+              Active: {selectedTournament.name}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr,1.2fr]">
@@ -127,6 +226,7 @@ const AdminTournaments = () => {
                 className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
               />
             </label>
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
             <button
               type="submit"
               className="w-full border border-black bg-black px-4 py-2 text-xs uppercase tracking-[0.3em] text-white"
@@ -148,96 +248,115 @@ const AdminTournaments = () => {
             </div>
           ) : (
             <div className="mt-4 space-y-4">
-              <select
-                value={selected?.id ?? ""}
-                onChange={(event) => {
-                  const next = tournaments.find((t) => t.id === event.target.value) ?? null;
-                  setSelected(next ? { ...next } : null);
-                }}
-                className="w-full border border-black/10 px-3 py-2 text-sm"
-              >
-                <option value="">Select tournament</option>
-                {tournaments.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>
-                    {tournament.name}
-                  </option>
-                ))}
-              </select>
+              {tournaments.map((tournament) => {
+                const editing = editingId === tournament.id;
+                const edit = editValues[tournament.id] ?? {};
+                return (
+                  <div key={tournament.id} className="border border-black/10 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-black">
+                          {tournament.name}
+                        </p>
+                        <p className="text-sm text-black/60">
+                          {tournament.location ?? "Location TBD"}
+                        </p>
+                        <p className="text-sm text-black/60">
+                          {formatDate(tournament.startTime)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="text-[0.65rem] uppercase tracking-[0.2em] text-black/50">
+                          Status
+                          <select
+                            value={tournament.status}
+                            onChange={(event) =>
+                              handleStatusChange(tournament.id, event.target.value)
+                            }
+                            className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                          >
+                            {statusOptions.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleEditToggle(tournament)}
+                          className="border border-black/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-black"
+                        >
+                          {editing ? "Editing" : "Edit"}
+                        </button>
+                      </div>
+                    </div>
 
-              {selected && (
-                <div className="space-y-3">
-                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
-                    Name
-                    <input
-                      type="text"
-                      value={selected.name}
-                      onChange={(event) =>
-                        setSelected((prev) =>
-                          prev ? { ...prev, name: event.target.value } : prev
-                        )
-                      }
-                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
-                    Location
-                    <input
-                      type="text"
-                      value={selected.location ?? ""}
-                      onChange={(event) =>
-                        setSelected((prev) =>
-                          prev ? { ...prev, location: event.target.value } : prev
-                        )
-                      }
-                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
-                    Start Time
-                    <input
-                      type="datetime-local"
-                      value={selected.startTime ?? ""}
-                      onChange={(event) =>
-                        setSelected((prev) =>
-                          prev ? { ...prev, startTime: event.target.value } : prev
-                        )
-                      }
-                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
-                    Status
-                    <select
-                      value={selected.status}
-                      onChange={(event) =>
-                        setSelected((prev) =>
-                          prev ? { ...prev, status: event.target.value } : prev
-                        )
-                      }
-                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
-                    >
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleUpdate}
-                    className="w-full border border-black/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-black"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              )}
-
-              {!selected && (
-                <p className="text-sm text-black/60">
-                  Select a tournament to update details.
-                </p>
-              )}
+                    {editing && (
+                      <div className="mt-4 space-y-3 border-t border-black/10 pt-4">
+                        <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                          Name
+                          <input
+                            type="text"
+                            value={edit.name ?? ""}
+                            onChange={(event) =>
+                              setEditValues((prev) => ({
+                                ...prev,
+                                [tournament.id]: { ...prev[tournament.id], name: event.target.value }
+                              }))
+                            }
+                            className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                          Location
+                          <input
+                            type="text"
+                            value={edit.location ?? ""}
+                            onChange={(event) =>
+                              setEditValues((prev) => ({
+                                ...prev,
+                                [tournament.id]: { ...prev[tournament.id], location: event.target.value }
+                              }))
+                            }
+                            className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                          Start Time
+                          <input
+                            type="datetime-local"
+                            value={edit.startTime ?? ""}
+                            onChange={(event) =>
+                              setEditValues((prev) => ({
+                                ...prev,
+                                [tournament.id]: { ...prev[tournament.id], startTime: event.target.value }
+                              }))
+                            }
+                            className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(tournament.id)}
+                            className="border border-black bg-black px-4 py-2 text-xs uppercase tracking-[0.3em] text-white"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="border border-black/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-black"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

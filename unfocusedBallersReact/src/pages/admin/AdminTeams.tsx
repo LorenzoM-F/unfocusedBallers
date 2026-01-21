@@ -44,7 +44,7 @@ const AdminTeams = () => {
   useEffect(() => {
     let active = true;
     Promise.all([
-      api.get<{ tournaments: Tournament[] }>("/public/tournaments"),
+      api.get<{ tournaments: Tournament[] }>("/admin/tournaments"),
       api.get<{ players: Player[] }>("/admin/players")
     ])
       .then(([tournamentRes, playerRes]) => {
@@ -52,7 +52,12 @@ const AdminTeams = () => {
         const loaded = tournamentRes.tournaments ?? [];
         setTournaments(loaded);
         setPlayers(playerRes.players ?? []);
-        if (loaded[0]) setSelectedTournament(loaded[0].id);
+        const stored = localStorage.getItem("adminSelectedTournamentId");
+        if (stored && loaded.some((tournament) => tournament.id === stored)) {
+          setSelectedTournament(stored);
+        } else if (loaded[0]) {
+          setSelectedTournament(loaded[0].id);
+        }
       })
       .catch(() => {
         if (!active) return;
@@ -81,6 +86,11 @@ const AdminTeams = () => {
     return () => {
       active = false;
     };
+  }, [selectedTournament]);
+
+  useEffect(() => {
+    if (!selectedTournament) return;
+    localStorage.setItem("adminSelectedTournamentId", selectedTournament);
   }, [selectedTournament]);
 
   const availablePlayers = useMemo(() => {
@@ -119,6 +129,9 @@ const AdminTeams = () => {
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-black/50">Admin</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Teams</h1>
+          <p className="mt-2 text-sm text-black/60">
+            Teams are normally auto-generated from registrations in the bracket page.
+          </p>
         </div>
         <div className="w-full max-w-xs">
           <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
@@ -167,7 +180,8 @@ const AdminTeams = () => {
             <div className="mt-4 space-y-2">
               {team.members.map((player) => (
                 <div key={player.id} className="border border-black/10 px-3 py-2 text-sm">
-                  {player.fullName}
+                  <p className="font-semibold text-black">{player.fullName}</p>
+                  {player.email && <p className="text-black/60">{player.email}</p>}
                 </div>
               ))}
               {team.members.length === 0 && (
