@@ -8,6 +8,13 @@ type ApiOptions = {
 
 const getToken = () => localStorage.getItem("token");
 
+const getApiUrl = () => {
+  if (!API_URL) {
+    throw new Error("VITE_API_URL is not set. Add it to your frontend .env file.");
+  }
+  return API_URL;
+};
+
 const request = async <T>(path: string, options: ApiOptions = {}) => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -19,7 +26,7 @@ const request = async <T>(path: string, options: ApiOptions = {}) => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${getApiUrl()}${path}`, {
     method: options.method ?? "GET",
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined
