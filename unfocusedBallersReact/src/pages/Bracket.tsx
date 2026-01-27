@@ -9,6 +9,7 @@ import {
 } from "react-brackets";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import TeamColorBadge from "../components/TeamColorBadge";
 
 type Tournament = {
   id: string;
@@ -20,9 +21,12 @@ type TeamMember = {
   fullName: string;
 };
 
+type TeamColor = "BLUE" | "BLACK" | "WHITE" | "RED";
+
 type Team = {
   id: string;
   name: string;
+  color?: TeamColor | null;
   members: TeamMember[];
 };
 
@@ -157,6 +161,13 @@ const Bracket = () => {
   const teamMembersById = useMemo(() => {
     return teams.reduce<Record<string, TeamMember[]>>((acc, team) => {
       acc[team.id] = team.members;
+      return acc;
+    }, {});
+  }, [teams]);
+
+  const teamColorsById = useMemo(() => {
+    return teams.reduce<Record<string, TeamColor | null>>((acc, team) => {
+      acc[team.id] = team.color ?? null;
       return acc;
     }, {});
   }, [teams]);
@@ -296,6 +307,10 @@ const Bracket = () => {
 
     const aScore = match ? match.scoreA : null;
     const bScore = match ? match.scoreB : null;
+    const teamAId = match?.teamA?.id ?? null;
+    const teamBId = match?.teamB?.id ?? null;
+    const teamAColor = teamAId ? teamColorsById[teamAId] ?? null : null;
+    const teamBColor = teamBId ? teamColorsById[teamBId] ?? null : null;
 
     return (
       <Seed mobileBreakpoint={breakpoint} className="p-2">
@@ -318,18 +333,24 @@ const Bracket = () => {
 
             <div className="px-3 py-2">
               <div className="flex items-center justify-between gap-3 py-1">
-                <SeedTeam className="!m-0 !p-0 !text-sm !text-black/90">
-                  {s.teams[0]?.name ?? "TBD"}
-                </SeedTeam>
+                <div className="flex items-center gap-2">
+                  <SeedTeam className="!m-0 !p-0 !text-sm !text-black/90">
+                    {match?.teamA?.name ?? s.teams[0]?.name ?? "TBD"}
+                  </SeedTeam>
+                  {teamAId && <TeamColorBadge color={teamAColor} />}
+                </div>
                 <span className="text-sm tabular-nums text-black/70">
                   {aScore === null ? "-" : aScore}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-3 py-1">
-                <SeedTeam className="!m-0 !p-0 !text-sm !text-black/90">
-                  {s.teams[1]?.name ?? "TBD"}
-                </SeedTeam>
+                <div className="flex items-center gap-2">
+                  <SeedTeam className="!m-0 !p-0 !text-sm !text-black/90">
+                    {match?.teamB?.name ?? s.teams[1]?.name ?? "TBD"}
+                  </SeedTeam>
+                  {teamBId && <TeamColorBadge color={teamBColor} />}
+                </div>
                 <span className="text-sm tabular-nums text-black/70">
                   {bScore === null ? "-" : bScore}
                 </span>
@@ -469,9 +490,25 @@ const Bracket = () => {
                   <p className="text-xs uppercase tracking-[0.2em] text-black/50">
                     {selectedMatch.matchType.replace("_", " ")} • {selectedMatch.status}
                   </p>
-                  <p className="mt-2 text-sm text-black/80">
-                    {selectedMatch.teamA?.name ?? "TBD"} vs {selectedMatch.teamB?.name ?? "TBD"}
-                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-black/80">
+                    <div className="flex items-center gap-2">
+                      <span>{selectedMatch.teamA?.name ?? "TBD"}</span>
+                      {selectedMatch.teamA?.id && (
+                        <TeamColorBadge
+                          color={teamColorsById[selectedMatch.teamA.id] ?? null}
+                        />
+                      )}
+                    </div>
+                    <span className="text-black/40">vs</span>
+                    <div className="flex items-center gap-2">
+                      <span>{selectedMatch.teamB?.name ?? "TBD"}</span>
+                      {selectedMatch.teamB?.id && (
+                        <TeamColorBadge
+                          color={teamColorsById[selectedMatch.teamB.id] ?? null}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {isAdmin && forms[selectedMatch.id] && (

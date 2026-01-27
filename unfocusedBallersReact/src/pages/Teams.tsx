@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import TeamColorBadge from "../components/TeamColorBadge";
 
 type Tournament = {
   id: string;
@@ -13,10 +14,13 @@ type TeamMember = {
   role: string;
 };
 
+type TeamColor = "BLUE" | "BLACK" | "WHITE" | "RED";
+
 type Team = {
   id: string;
   name: string;
   tournamentId: string | null;
+  color?: TeamColor | null;
   members: TeamMember[];
 };
 
@@ -122,7 +126,10 @@ const Teams = () => {
         {teams.map((team) => (
           <div key={team.id} className="border border-black/10 bg-white p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">{team.name}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold tracking-tight">{team.name}</h2>
+                <TeamColorBadge color={team.color} />
+              </div>
               <span className="text-xs uppercase tracking-[0.2em] text-black/50">
                 {team.members.length} players
               </span>

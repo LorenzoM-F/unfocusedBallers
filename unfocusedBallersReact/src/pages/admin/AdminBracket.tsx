@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
+import TeamColorBadge from "../../components/TeamColorBadge";
 
 type Tournament = {
   id: string;
@@ -28,9 +29,12 @@ type TeamMember = {
   email?: string;
 };
 
+type TeamColor = "BLUE" | "BLACK" | "WHITE" | "RED";
+
 type Team = {
   id: string;
   name: string;
+  color?: TeamColor | null;
   members: TeamMember[];
 };
 
@@ -196,6 +200,13 @@ const AdminBracket = () => {
   const teamById = useMemo(() => {
     return teams.reduce<Record<string, Team>>((acc, team) => {
       acc[team.id] = team;
+      return acc;
+    }, {});
+  }, [teams]);
+
+  const teamColorsById = useMemo(() => {
+    return teams.reduce<Record<string, TeamColor | null>>((acc, team) => {
+      acc[team.id] = team.color ?? null;
       return acc;
     }, {});
   }, [teams]);
@@ -397,9 +408,25 @@ const AdminBracket = () => {
                       <p className="text-xs uppercase tracking-[0.3em] text-black/50">
                         {matchLabel(matchType)}
                       </p>
-                      <p className="mt-2 text-sm text-black/70">
-                        {match?.teamA?.name ?? "TBD"} vs {match?.teamB?.name ?? "TBD"}
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-black/70">
+                        <div className="flex items-center gap-2">
+                          <span>{match?.teamA?.name ?? "TBD"}</span>
+                          {match?.teamA?.id && (
+                            <TeamColorBadge
+                              color={teamColorsById[match.teamA.id] ?? null}
+                            />
+                          )}
+                        </div>
+                        <span className="text-black/40">vs</span>
+                        <div className="flex items-center gap-2">
+                          <span>{match?.teamB?.name ?? "TBD"}</span>
+                          {match?.teamB?.id && (
+                            <TeamColorBadge
+                              color={teamColorsById[match.teamB.id] ?? null}
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <div className="text-xs uppercase tracking-[0.2em] text-black/50">
                       {match?.status ?? "SCHEDULED"}
@@ -582,10 +609,13 @@ const AdminBracket = () => {
                           <p className="font-semibold text-black">
                             {goal.scoringPlayerName ?? "Player"}
                           </p>
-                          <p className="text-black/60">
-                            {teamById[goal.scoringTeamId]?.name ?? "Team"}
-                            {goal.minute !== null ? ` • ${goal.minute}'` : ""}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 text-black/60">
+                            <span>{teamById[goal.scoringTeamId]?.name ?? "Team"}</span>
+                            <TeamColorBadge
+                              color={teamColorsById[goal.scoringTeamId] ?? null}
+                            />
+                            {goal.minute !== null && <span>• {goal.minute}'</span>}
+                          </div>
                         </div>
                         <button
                           type="button"

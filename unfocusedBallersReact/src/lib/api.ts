@@ -6,6 +6,15 @@ type ApiOptions = {
   headers?: Record<string, string>;
 };
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 const getToken = () => localStorage.getItem("token");
 
 const getApiUrl = () => {
@@ -42,7 +51,10 @@ const request = async <T>(path: string, options: ApiOptions = {}) => {
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    throw new Error("Network error. Please try again.");
+    const message =
+      (isJson && typeof data?.error === "string" && data.error) ||
+      "Network error. Please try again.";
+    throw new ApiError(response.status, message);
   }
 
   return data as T;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
+import { ApiError, api } from "../../lib/api";
+import TeamColorBadge from "../../components/TeamColorBadge";
 
 type Tournament = {
   id: string;
@@ -13,9 +14,12 @@ type Player = {
   role: string;
 };
 
+type TeamColor = "BLUE" | "BLACK" | "WHITE" | "RED";
+
 type Team = {
   id: string;
   name: string;
+  color?: TeamColor | null;
   members: Player[];
 };
 
@@ -26,6 +30,7 @@ const AdminTeams = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [nameEdits, setNameEdits] = useState<Record<string, string>>({});
   const [addPlayer, setAddPlayer] = useState<Record<string, string>>({});
+  const [colorErrors, setColorErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +87,7 @@ const AdminTeams = () => {
       if (!active) return;
       setError("We couldn't load teams right now. Please try again.");
     });
+    setColorErrors({});
 
     return () => {
       active = false;
@@ -120,6 +126,33 @@ const AdminTeams = () => {
       await loadPlayers();
     } catch {
       setError("We couldn't add the player. Please try again.");
+    }
+  };
+
+  const handleColorChange = async (teamId: string, color: TeamColor | null) => {
+    setError(null);
+    setTeams((prev) =>
+      prev.map((team) => (team.id === teamId ? { ...team, color } : team))
+    );
+    try {
+      await api.patch(`/admin/teams/${teamId}`, { color });
+      await loadTeams(selectedTournament);
+      setColorErrors((prev) => {
+        if (!prev[teamId]) return prev;
+        const next = { ...prev };
+        delete next[teamId];
+        return next;
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setColorErrors((prev) => ({
+          ...prev,
+          [teamId]: "This colour is already assigned in this tournament"
+        }));
+      } else {
+        setError("We couldn't update the team color. Please try again.");
+      }
+      await loadTeams(selectedTournament);
     }
   };
 
@@ -171,7 +204,10 @@ const AdminTeams = () => {
         {teams.map((team) => (
           <div key={team.id} className="border border-black/10 bg-white p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">{team.name}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold tracking-tight">{team.name}</h2>
+                <TeamColorBadge color={team.color} />
+              </div>
               <span className="text-xs uppercase tracking-[0.2em] text-black/50">
                 {team.members.length} players
               </span>
@@ -210,6 +246,35 @@ const AdminTeams = () => {
               >
                 Save Name
               </button>
+            </div>
+
+            <div className="mt-4 space-y-3 border-t border-black/10 pt-4">
+              <label className="text-xs uppercase tracking-[0.2em] text-black/50">
+                Team Color
+                <select
+                  value={team.color ?? ""}
+                  onChange={(event) => {
+                    const next = event.target.value as TeamColor | "";
+                    handleColorChange(team.id, next === "" ? null : next);
+                  }}
+                  className="mt-2 w-full border border-black/10 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">None</option>
+                  {(["BLUE", "BLACK", "WHITE", "RED"] as const).map((color) => {
+                    const inUse = teams.some(
+                      (t) => t.id !== team.id && t.color === color
+                    );
+                    return (
+                      <option key={color} value={color} disabled={inUse}>
+                        {color.slice(0, 1) + color.slice(1).toLowerCase()}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              {colorErrors[team.id] && (
+                <p className="text-xs text-red-600">{colorErrors[team.id]}</p>
+              )}
             </div>
 
             <div className="mt-4 space-y-3 border-t border-black/10 pt-4">
