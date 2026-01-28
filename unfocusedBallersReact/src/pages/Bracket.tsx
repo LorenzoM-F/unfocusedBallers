@@ -189,6 +189,31 @@ const Bracket = () => {
     );
   }, [matches]);
 
+  const results = useMemo(() => {
+    const final = matchByType.FINAL;
+    const third = matchByType.THIRD_PLACE;
+
+    const resolveWinner = (match?: Match) => {
+      if (!match || match.status !== "FINAL") return null;
+      if (!match.teamA?.name || !match.teamB?.name) return null;
+      if (match.scoreA === match.scoreB) return null;
+      return match.scoreA > match.scoreB ? match.teamA.name : match.teamB.name;
+    };
+
+    const resolveLoser = (match?: Match) => {
+      if (!match || match.status !== "FINAL") return null;
+      if (!match.teamA?.name || !match.teamB?.name) return null;
+      if (match.scoreA === match.scoreB) return null;
+      return match.scoreA > match.scoreB ? match.teamB.name : match.teamA.name;
+    };
+
+    return {
+      champion: resolveWinner(final),
+      runnerUp: resolveLoser(final),
+      thirdPlace: resolveWinner(third)
+    };
+  }, [matchByType]);
+
   const mainRounds: IRoundProps[] = useMemo(() => {
     const semi1 = matchByType.SEMI_1;
     const semi2 = matchByType.SEMI_2;
@@ -448,6 +473,7 @@ const Bracket = () => {
           No tournaments available yet. Create one to generate a bracket.
         </div>
       ) : (
+      <>
       <div className="grid gap-10 xl:grid-cols-[2fr,1fr]">
         {/* BRACKET */}
         <div className="space-y-6">
@@ -486,7 +512,32 @@ const Bracket = () => {
             </div>
           </div>
 
-
+          <div className="border border-black/10 bg-white p-6 shadow-card">
+            <p className="text-xs uppercase tracking-[0.3em] text-black/50">Results</p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight">
+              Tournament standings
+            </h2>
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              <div className="border border-black/10 px-4 py-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.2em] text-black/50">🥇 Gold</p>
+                <p className="mt-2 text-base font-semibold">
+                  {results.champion ?? "TBD"}
+                </p>
+              </div>
+              <div className="border border-black/10 px-4 py-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.2em] text-black/50">🥈 Silver</p>
+                <p className="mt-2 text-base font-semibold">
+                  {results.runnerUp ?? "TBD"}
+                </p>
+              </div>
+              <div className="border border-black/10 px-4 py-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.2em] text-black/50">🥉 Bronze</p>
+                <p className="mt-2 text-base font-semibold">
+                  {results.thirdPlace ?? "TBD"}
+                </p>
+              </div>
+            </div>
+          </div>
 
           <p className="text-xs uppercase tracking-[0.2em] text-black/50">
             Scroll horizontally on small screens.
@@ -766,6 +817,7 @@ const Bracket = () => {
           </div>
         </div>
       </div>
+      </>
       )}
     </section>
   );
