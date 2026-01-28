@@ -42,6 +42,9 @@ const Navbar = () => {
           <NavLink to="/bracket" className={navLinkClass}>
             Bracket
           </NavLink>
+          <NavLink to="/stats" className={navLinkClass}>
+            Stats
+          </NavLink>
           <NavLink to="/teams" className={navLinkClass}>
             Teams
           </NavLink>

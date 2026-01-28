@@ -8,6 +8,7 @@ import TournamentDetail from "./pages/TournamentDetail";
 import Bracket from "./pages/Bracket";
 import Teams from "./pages/Teams";
 import Gallery from "./pages/Gallery";
+import Stats from "./pages/Stats";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -27,6 +28,7 @@ const App = () => {
         <Route path="bracket" element={<Bracket />} />
         <Route path="teams" element={<Teams />} />
         <Route path="gallery" element={<Gallery />} />
+        <Route path="stats" element={<Stats />} />
         <Route path="login" element={<Login />} />
         <Route
           path="profile"
