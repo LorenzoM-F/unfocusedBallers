@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import zipItWinners from "../assets/ZipItWinners.png";
 
 type Winner = {
   headline: string;
@@ -228,18 +229,18 @@ const Home = () => {
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
           <div className="flex-1">
-            {winner?.heroImageUrl ? (
+            {winner ? (
               <img
-                src={winner.heroImageUrl}
-                alt={winner.headline}
+                src={winner.heroImageUrl ?? zipItWinners}
+                alt={winner.headline ?? "Tournament winners"}
                 className="h-72 w-full object-cover shadow-soft transition duration-500 hover:scale-[1.01]"
               />
             ) : (
-              <div className="relative flex h-72 w-full items-center justify-center border border-dashed border-black/20 text-xs uppercase tracking-[0.3em] text-black/40">
-                <div className="absolute inset-6 border border-black/10" />
-                <div className="absolute left-1/2 top-6 h-[calc(100%-3rem)] w-px bg-black/10" />
-                Hero image coming soon
-              </div>
+              <img
+                src={zipItWinners}
+                alt="Tournament winners"
+                className="h-72 w-full object-cover shadow-soft transition duration-500 hover:scale-[1.01]"
+              />
             )}
           </div>
         </div>
