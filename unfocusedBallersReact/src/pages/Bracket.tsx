@@ -54,7 +54,12 @@ type MatchUpdateForm = {
 type GoalForm = {
   scoringTeamId: string;
   scoringPlayerId: string;
-  assistPlayerId: string;
+  minute: string;
+};
+
+type AssistForm = {
+  assistingTeamId: string;
+  assistingPlayerId: string;
   minute: string;
 };
 
@@ -80,6 +85,7 @@ const Bracket = () => {
 
   const [forms, setForms] = useState<Record<string, MatchUpdateForm>>({});
   const [goalForms, setGoalForms] = useState<Record<string, GoalForm>>({});
+  const [assistForms, setAssistForms] = useState<Record<string, AssistForm>>({});
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -256,6 +262,16 @@ const Bracket = () => {
     }));
   };
 
+  const handleAssistChange = (id: string, field: keyof AssistForm, value: string) => {
+    setAssistForms((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value,
+      },
+    }));
+  };
+
   const handleUpdateMatch = async (match: Match) => {
     setActionError(null);
     const form = forms[match.id];
@@ -285,21 +301,39 @@ const Bracket = () => {
       await api.post(`/admin/matches/${match.id}/goals`, {
         scoringTeamId: form.scoringTeamId,
         scoringPlayerId: form.scoringPlayerId,
-        assistPlayerId: form.assistPlayerId || undefined,
         minute: form.minute ? Number(form.minute) : undefined,
       });
 
       setGoalForms((prev) => ({
         ...prev,
-        [match.id]: {
-          scoringTeamId: form.scoringTeamId,
-          scoringPlayerId: "",
-          assistPlayerId: "",
-          minute: ""
-        },
+        [match.id]: { scoringTeamId: form.scoringTeamId, scoringPlayerId: "", minute: "" },
       }));
     } catch {
       setActionError("We couldn't add the goal. Please try again.");
+    }
+  };
+
+  const handleAddAssist = async (match: Match) => {
+    setActionError(null);
+    const form = assistForms[match.id];
+    if (!form?.assistingTeamId || !form?.assistingPlayerId) {
+      setActionError("Select an assisting team and player.");
+      return;
+    }
+
+    try {
+      await api.post(`/admin/matches/${match.id}/assists`, {
+        assistingTeamId: form.assistingTeamId,
+        assistingPlayerId: form.assistingPlayerId,
+        minute: form.minute ? Number(form.minute) : undefined,
+      });
+
+      setAssistForms((prev) => ({
+        ...prev,
+        [match.id]: { assistingTeamId: form.assistingTeamId, assistingPlayerId: "", minute: "" },
+      }));
+    } catch {
+      setActionError("We couldn't add the assist. Please try again.");
     }
   };
 
@@ -580,8 +614,7 @@ const Bracket = () => {
                             [selectedMatch.id]: {
                               ...prev[selectedMatch.id],
                               scoringTeamId: e.target.value,
-                              scoringPlayerId: "",
-                              assistPlayerId: ""
+                              scoringPlayerId: ""
                             }
                           }))
                         }
@@ -618,26 +651,6 @@ const Bracket = () => {
                     </label>
 
                     <label className="text-xs uppercase tracking-[0.2em] text-black/50">
-                      Assist Player
-                      <select
-                        value={goalForms[selectedMatch.id]?.assistPlayerId ?? ""}
-                        onChange={(e) => handleGoalChange(selectedMatch.id, "assistPlayerId", e.target.value)}
-                        className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
-                      >
-                        <option value="">No assist</option>
-                        {(
-                          goalForms[selectedMatch.id]?.scoringTeamId
-                            ? teamMembersById[goalForms[selectedMatch.id].scoringTeamId] || []
-                            : []
-                        ).map((player) => (
-                          <option key={player.id} value={player.id}>
-                            {player.fullName}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-xs uppercase tracking-[0.2em] text-black/50">
                       Minute
                       <input
                         type="number"
@@ -655,6 +668,89 @@ const Bracket = () => {
                     >
                       Add Goal
                     </button>
+
+                    <div className="space-y-3 border-t border-black/10 pt-4">
+                      <p className="text-xs uppercase tracking-[0.2em] text-black/50">Add Assist</p>
+
+                      <label className="text-xs uppercase tracking-[0.2em] text-black/50">
+                        Assisting Team
+                        <select
+                          value={assistForms[selectedMatch.id]?.assistingTeamId ?? ""}
+                          onChange={(e) =>
+                            setAssistForms((prev) => ({
+                              ...prev,
+                              [selectedMatch.id]: {
+                                ...prev[selectedMatch.id],
+                                assistingTeamId: e.target.value,
+                                assistingPlayerId: ""
+                              }
+                            }))
+                          }
+                          className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                        >
+                          <option value="">Select team</option>
+                          {selectedMatch.teamA?.id && (
+                            <option value={selectedMatch.teamA.id}>
+                              {selectedMatch.teamA.name}
+                            </option>
+                          )}
+                          {selectedMatch.teamB?.id && (
+                            <option value={selectedMatch.teamB.id}>
+                              {selectedMatch.teamB.name}
+                            </option>
+                          )}
+                        </select>
+                      </label>
+
+                      <label className="text-xs uppercase tracking-[0.2em] text-black/50">
+                        Assisting Player
+                        <select
+                          value={assistForms[selectedMatch.id]?.assistingPlayerId ?? ""}
+                          onChange={(e) =>
+                            handleAssistChange(
+                              selectedMatch.id,
+                              "assistingPlayerId",
+                              e.target.value
+                            )
+                          }
+                          className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                        >
+                          <option value="">Select player</option>
+                          {(
+                            assistForms[selectedMatch.id]?.assistingTeamId
+                              ? teamMembersById[
+                                  assistForms[selectedMatch.id].assistingTeamId
+                                ] || []
+                              : []
+                          ).map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.fullName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs uppercase tracking-[0.2em] text-black/50">
+                        Minute
+                        <input
+                          type="number"
+                          min={0}
+                          value={assistForms[selectedMatch.id]?.minute ?? ""}
+                          onChange={(e) =>
+                            handleAssistChange(selectedMatch.id, "minute", e.target.value)
+                          }
+                          className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddAssist(selectedMatch)}
+                        className="w-full border border-black/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-black"
+                      >
+                        Add Assist
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -11,9 +11,11 @@ type Summary = {
   matchesPlayed: number;
   totalGoals: number;
   goalsPerMatch: number;
+  totalAssists: number;
+  assistsPerMatch: number;
 };
 
-type LeaderboardEntry = {
+type GoalsLeaderboardEntry = {
   playerId: string;
   playerName: string;
   teamId: string;
@@ -21,6 +23,31 @@ type LeaderboardEntry = {
   goals: number;
   matchesPlayed: number;
   goalsPerGame: number;
+};
+
+type AssistsLeaderboardEntry = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  assists: number;
+  matchesPlayed: number;
+  assistsPerGame: number;
+};
+
+type OverallLeaderboardEntry = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  goals: number;
+  assists: number;
+  matchesPlayed: number;
+  goalsPerGame: number;
+  assistsPerGame: number;
+  wins: number;
+  losses: number;
+  rating: number;
 };
 
 type MatchTeam = {
@@ -34,8 +61,6 @@ type MatchGoal = {
   scoringTeamName: string;
   scoringPlayerId: string;
   scoringPlayerName: string;
-  assistPlayerId?: string | null;
-  assistPlayerName?: string | null;
   minute: number | null;
   createdAt: string;
 };
@@ -54,8 +79,14 @@ type MatchStats = {
 type StatsResponse = {
   tournament: Tournament;
   summary: Summary;
-  leaderboard: LeaderboardEntry[];
+  leaderboard: GoalsLeaderboardEntry[];
+  assistsLeaderboard: AssistsLeaderboardEntry[];
   matches: MatchStats[];
+};
+
+type OverallStatsResponse = {
+  tournament: Tournament;
+  leaderboard: OverallLeaderboardEntry[];
 };
 
 const matchTypeLabel: Record<MatchStats["matchType"], string> = {
@@ -65,7 +96,7 @@ const matchTypeLabel: Record<MatchStats["matchType"], string> = {
   THIRD_PLACE: "Third Place"
 };
 
-const formatGoalsPerGame = (value: number) => {
+const formatRate = (value: number) => {
   if (!Number.isFinite(value)) return "0.00";
   return value.toFixed(2);
 };
@@ -85,7 +116,11 @@ const Stats = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<string>("");
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [overallLeaderboard, setOverallLeaderboard] = useState<OverallLeaderboardEntry[]>([]);
   const [activeTab, setActiveTab] = useState<"leaderboard" | "matches">("leaderboard");
+  const [leaderboardMetric, setLeaderboardMetric] = useState<
+    "goals" | "assists" | "overall"
+  >("goals");
   const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({});
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -127,11 +162,14 @@ const Stats = () => {
     setError(null);
     setLoadingStats(true);
 
-    api
-      .get<StatsResponse>(`/public/stats?tournamentId=${selectedTournament}`)
-      .then((data) => {
+    Promise.all([
+      api.get<StatsResponse>(`/public/stats?tournamentId=${selectedTournament}`),
+      api.get<OverallStatsResponse>(`/public/stats/overall?tournamentId=${selectedTournament}`)
+    ])
+      .then(([statsData, overallData]) => {
         if (!active) return;
-        setStats(data);
+        setStats(statsData);
+        setOverallLeaderboard(overallData.leaderboard ?? []);
         setExpandedMatches({});
       })
       .catch(() => {
@@ -150,21 +188,46 @@ const Stats = () => {
 
   const summaryCards = useMemo(() => {
     if (!stats) return [];
+    if (leaderboardMetric === "overall") {
+      return [
+        {
+          label: "Matches Played",
+          value: stats.summary.matchesPlayed
+        },
+        {
+          label: "Total Goals",
+          value: stats.summary.totalGoals
+        },
+        {
+          label: "Total Assists",
+          value: stats.summary.totalAssists
+        }
+      ];
+    }
+    const isGoals = leaderboardMetric === "goals";
     return [
       {
         label: "Matches Played",
         value: stats.summary.matchesPlayed
       },
       {
-        label: "Total Goals",
-        value: stats.summary.totalGoals
+        label: isGoals ? "Total Goals" : "Total Assists",
+        value: isGoals ? stats.summary.totalGoals : stats.summary.totalAssists
       },
       {
-        label: "Goals Per Match",
-        value: formatGoalsPerGame(stats.summary.goalsPerMatch)
+        label: isGoals ? "Goals Per Match" : "Assists Per Match",
+        value: formatRate(
+          isGoals ? stats.summary.goalsPerMatch : stats.summary.assistsPerMatch
+        )
       }
     ];
-  }, [stats]);
+  }, [stats, leaderboardMetric]);
+
+  const leaderboardData = useMemo(() => {
+    if (!stats) return [];
+    if (leaderboardMetric === "overall") return [];
+    return leaderboardMetric === "goals" ? stats.leaderboard : stats.assistsLeaderboard;
+  }, [stats, leaderboardMetric]);
 
   return (
     <section className="space-y-8">
@@ -251,66 +314,206 @@ const Stats = () => {
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-black/50">Leaderboard</p>
               <h2 className="mt-2 text-xl font-semibold tracking-tight">
-                Goals & Goals Per Game
+                {leaderboardMetric === "overall"
+                  ? "Overall Performance"
+                  : leaderboardMetric === "goals"
+                  ? "Goals Leaderboard"
+                  : "Assists Leaderboard"}
               </h2>
             </div>
             <span className="text-xs uppercase tracking-[0.2em] text-black/50">
-              {stats.leaderboard.length} players
+              {leaderboardMetric === "overall"
+                ? overallLeaderboard.length
+                : leaderboardData.length}{" "}
+              players
             </span>
           </div>
 
-          <div className="mt-6 space-y-3">
-            <div className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)] md:gap-3 md:border-b md:border-black/10 md:pb-2">
-              <span>Player</span>
-              <span>Team</span>
-              <span>Goals</span>
-              <span>Matches</span>
-              <span>Goals/Game</span>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em] text-black/50">
+            <button
+              type="button"
+              onClick={() => setLeaderboardMetric("goals")}
+              className={`rounded-full px-3 py-1 transition ${
+                leaderboardMetric === "goals"
+                  ? "bg-black text-white"
+                  : "text-black/60 hover:text-black"
+              }`}
+            >
+              Goals
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeaderboardMetric("assists")}
+              className={`rounded-full px-3 py-1 transition ${
+                leaderboardMetric === "assists"
+                  ? "bg-black text-white"
+                  : "text-black/60 hover:text-black"
+              }`}
+            >
+              Assists
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeaderboardMetric("overall")}
+              className={`rounded-full px-3 py-1 transition ${
+                leaderboardMetric === "overall"
+                  ? "bg-black text-white"
+                  : "text-black/60 hover:text-black"
+              }`}
+            >
+              Overall
+            </button>
+          </div>
+
+          {leaderboardMetric !== "overall" ? (
+            <div className="mt-6 space-y-3">
+              <div className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)] md:gap-3 md:border-b md:border-black/10 md:pb-2">
+                <span>Player</span>
+                <span>Team</span>
+                <span>{leaderboardMetric === "goals" ? "Goals" : "Assists"}</span>
+                <span>Matches</span>
+                <span>
+                  {leaderboardMetric === "goals" ? "Goals/Game" : "Assists/Game"}
+                </span>
+              </div>
+              {leaderboardData.map((player, index) => {
+                const primaryValue =
+                  leaderboardMetric === "goals"
+                    ? (player as GoalsLeaderboardEntry).goals
+                    : (player as AssistsLeaderboardEntry).assists;
+                const perGameValue =
+                  leaderboardMetric === "goals"
+                    ? (player as GoalsLeaderboardEntry).goalsPerGame
+                    : (player as AssistsLeaderboardEntry).assistsPerGame;
+                return (
+                  <div
+                    key={player.playerId}
+                    className="grid gap-2 border border-black/10 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)] md:items-center"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold tracking-tight">
+                        {index + 1}. {player.playerName}
+                      </p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                        {player.teamName}
+                      </p>
+                    </div>
+                    <p className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:block">
+                      {player.teamName}
+                    </p>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                        {leaderboardMetric === "goals" ? "Goals" : "Assists"}
+                      </p>
+                      <p className="text-base font-semibold">{primaryValue}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                        Matches
+                      </p>
+                      <p className="text-base font-semibold">{player.matchesPlayed}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                        {leaderboardMetric === "goals" ? "Goals/Game" : "Assists/Game"}
+                      </p>
+                      <p className="text-base font-semibold">{formatRate(perGameValue)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {leaderboardData.length === 0 && (
+                <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
+                  {leaderboardMetric === "goals"
+                    ? "No players or goals logged for this tournament yet."
+                    : "No players or assists logged for this tournament yet."}
+                </div>
+              )}
             </div>
-            {stats.leaderboard.map((player, index) => (
-              <div
-                key={player.playerId}
-                className="grid gap-2 border border-black/10 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)] md:items-center"
-              >
-                <div>
-                  <p className="text-sm font-semibold tracking-tight">
-                    {index + 1}. {player.playerName}
-                  </p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+          ) : (
+            <div className="mt-6 space-y-3">
+              <div className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:grid md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] md:gap-3 md:border-b md:border-black/10 md:pb-2">
+                <span>Player</span>
+                <span>Team</span>
+                <span>Rating</span>
+                <span>Wins</span>
+                <span>Losses</span>
+                <span>Goals</span>
+                <span>Assists</span>
+                <span>G/Game</span>
+                <span>A/Game</span>
+              </div>
+              {overallLeaderboard.map((player, index) => (
+                <div
+                  key={player.playerId}
+                  className="grid gap-2 border border-black/10 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] md:items-center"
+                >
+                  <div>
+                    <p className="text-sm font-semibold tracking-tight">
+                      {index + 1}. {player.playerName}
+                    </p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      {player.teamName}
+                    </p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      Goals: {player.goals} • Assists: {player.assists}
+                    </p>
+                  </div>
+                  <p className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:block">
                     {player.teamName}
                   </p>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      Rating
+                    </p>
+                    <p className="text-base font-semibold">{formatRate(player.rating)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      Wins
+                    </p>
+                    <p className="text-base font-semibold">{player.wins}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      Losses
+                    </p>
+                    <p className="text-base font-semibold">{player.losses}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      Goals
+                    </p>
+                    <p className="text-base font-semibold">{player.goals}</p>
+                  </div>
+                  <div className="hidden md:block">
+                    <p className="text-base font-semibold">{player.assists}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      G/Game
+                    </p>
+                    <p className="text-base font-semibold">
+                      {formatRate(player.goalsPerGame)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                      A/Game
+                    </p>
+                    <p className="text-base font-semibold">
+                      {formatRate(player.assistsPerGame)}
+                    </p>
+                  </div>
                 </div>
-                <p className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:block">
-                  {player.teamName}
-                </p>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
-                    Goals
-                  </p>
-                  <p className="text-base font-semibold">{player.goals}</p>
+              ))}
+              {overallLeaderboard.length === 0 && (
+                <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
+                  No overall stats available for this tournament yet.
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
-                    Matches
-                  </p>
-                  <p className="text-base font-semibold">{player.matchesPlayed}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
-                    Goals/Game
-                  </p>
-                  <p className="text-base font-semibold">
-                    {formatGoalsPerGame(player.goalsPerGame)}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {stats.leaderboard.length === 0 && (
-              <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
-                No players or goals logged for this tournament yet.
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -376,11 +579,6 @@ const Stats = () => {
                           <p className="text-xs uppercase tracking-[0.2em] text-black/50">
                             {goal.scoringTeamName}
                           </p>
-                          {goal.assistPlayerName && (
-                            <p className="text-xs uppercase tracking-[0.2em] text-black/40">
-                              Assist: {goal.assistPlayerName}
-                            </p>
-                          )}
                         </div>
                         <span className="text-xs uppercase tracking-[0.2em] text-black/50">
                           {goal.minute !== null ? `${goal.minute}'` : "Minute N/A"}

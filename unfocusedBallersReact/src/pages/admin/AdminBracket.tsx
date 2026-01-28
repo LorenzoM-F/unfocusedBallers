@@ -44,8 +44,16 @@ type Goal = {
   scoringTeamId: string;
   scoringPlayerId: string;
   scoringPlayerName?: string;
-  assistPlayerId?: string | null;
-  assistPlayerName?: string | null;
+  minute: number | null;
+  createdAt?: string;
+};
+
+type Assist = {
+  id: string;
+  matchId: string;
+  assistingTeamId: string;
+  assistingPlayerId: string;
+  assistingPlayerName?: string;
   minute: number | null;
   createdAt?: string;
 };
@@ -59,7 +67,12 @@ type MatchForm = {
 type GoalForm = {
   scoringTeamId: string;
   scoringPlayerId: string;
-  assistPlayerId: string;
+  minute: string;
+};
+
+type AssistForm = {
+  assistingTeamId: string;
+  assistingPlayerId: string;
   minute: string;
 };
 
@@ -72,12 +85,17 @@ const AdminBracket = () => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [assists, setAssists] = useState<Assist[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [matchForms, setMatchForms] = useState<Record<string, MatchForm>>({});
   const [goalForm, setGoalForm] = useState<GoalForm>({
     scoringTeamId: "",
     scoringPlayerId: "",
-    assistPlayerId: "",
+    minute: ""
+  });
+  const [assistForm, setAssistForm] = useState<AssistForm>({
+    assistingTeamId: "",
+    assistingPlayerId: "",
     minute: ""
   });
   const [loading, setLoading] = useState(true);
@@ -126,6 +144,11 @@ const AdminBracket = () => {
   const refreshGoals = async (matchId: string) => {
     const data = await api.get<{ goals: Goal[] }>(`/admin/matches/${matchId}/goals`);
     setGoals(data.goals ?? []);
+  };
+
+  const refreshAssists = async (matchId: string) => {
+    const data = await api.get<{ assists: Assist[] }>(`/admin/matches/${matchId}/assists`);
+    setAssists(data.assists ?? []);
   };
 
   useEffect(() => {
@@ -179,6 +202,7 @@ const AdminBracket = () => {
 
     setSelectedMatchId(null);
     setGoals([]);
+    setAssists([]);
 
     return () => {
       active = false;
@@ -189,6 +213,9 @@ const AdminBracket = () => {
     if (!selectedMatchId) return;
     refreshGoals(selectedMatchId).catch(() => {
       setActionError("We couldn't load goals right now. Please try again.");
+    });
+    refreshAssists(selectedMatchId).catch(() => {
+      setActionError("We couldn't load assists right now. Please try again.");
     });
   }, [selectedMatchId]);
 
@@ -300,13 +327,11 @@ const AdminBracket = () => {
       await api.post(`/admin/matches/${selectedMatchId}/goals`, {
         scoringTeamId: goalForm.scoringTeamId,
         scoringPlayerId: goalForm.scoringPlayerId,
-        assistPlayerId: goalForm.assistPlayerId || undefined,
         minute: goalForm.minute ? Number(goalForm.minute) : undefined
       });
       setGoalForm({
         scoringTeamId: goalForm.scoringTeamId,
         scoringPlayerId: "",
-        assistPlayerId: "",
         minute: ""
       });
       await Promise.all([
@@ -315,6 +340,30 @@ const AdminBracket = () => {
       ]);
     } catch {
       setActionError("We couldn't add the goal. Please try again.");
+    }
+  };
+
+  const handleAddAssist = async () => {
+    if (!selectedMatchId) return;
+    if (!assistForm.assistingTeamId || !assistForm.assistingPlayerId) {
+      setActionError("Select a team and player first.");
+      return;
+    }
+    setActionError(null);
+    try {
+      await api.post(`/admin/matches/${selectedMatchId}/assists`, {
+        assistingTeamId: assistForm.assistingTeamId,
+        assistingPlayerId: assistForm.assistingPlayerId,
+        minute: assistForm.minute ? Number(assistForm.minute) : undefined
+      });
+      setAssistForm({
+        assistingTeamId: assistForm.assistingTeamId,
+        assistingPlayerId: "",
+        minute: ""
+      });
+      await refreshAssists(selectedMatchId);
+    } catch {
+      setActionError("We couldn't add the assist. Please try again.");
     }
   };
 
@@ -329,6 +378,17 @@ const AdminBracket = () => {
       ]);
     } catch {
       setActionError("We couldn't delete the goal. Please try again.");
+    }
+  };
+
+  const handleDeleteAssist = async (assistId: string) => {
+    if (!selectedMatchId) return;
+    setActionError(null);
+    try {
+      await api.delete(`/admin/assists/${assistId}`);
+      await refreshAssists(selectedMatchId);
+    } catch {
+      setActionError("We couldn't delete the assist. Please try again.");
     }
   };
 
@@ -523,7 +583,7 @@ const AdminBracket = () => {
                       disabled={!match}
                       className="border border-black/30 px-4 py-2 text-xs uppercase tracking-[0.3em] text-black disabled:opacity-50"
                     >
-                      Manage Goals
+                      Manage Goals & Assists
                     </button>
                   </div>
                 </div>
@@ -532,7 +592,9 @@ const AdminBracket = () => {
           </div>
 
           <div className="border border-black/10 bg-white p-5 shadow-card">
-            <p className="text-xs uppercase tracking-[0.3em] text-black/50">Goals</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-black/50">
+              Goals & Assists
+            </p>
             {selectedMatchId ? (
               <div className="mt-4 space-y-4">
                 <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
@@ -543,8 +605,7 @@ const AdminBracket = () => {
                       setGoalForm((prev) => ({
                         ...prev,
                         scoringTeamId: event.target.value,
-                        scoringPlayerId: "",
-                        assistPlayerId: ""
+                        scoringPlayerId: ""
                       }))
                     }
                     className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
@@ -576,29 +637,6 @@ const AdminBracket = () => {
                     className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
                   >
                     <option value="">Select player</option>
-                    {(goalForm.scoringTeamId
-                      ? teamById[goalForm.scoringTeamId]?.members ?? []
-                      : []).map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.fullName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
-                  Assist Player
-                  <select
-                    value={goalForm.assistPlayerId}
-                    onChange={(event) =>
-                      setGoalForm((prev) => ({
-                        ...prev,
-                        assistPlayerId: event.target.value
-                      }))
-                    }
-                    className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
-                  >
-                    <option value="">No assist</option>
                     {(goalForm.scoringTeamId
                       ? teamById[goalForm.scoringTeamId]?.members ?? []
                       : []).map((player) => (
@@ -648,9 +686,6 @@ const AdminBracket = () => {
                             <TeamColorBadge
                               color={teamColorsById[goal.scoringTeamId] ?? null}
                             />
-                            {goal.assistPlayerName && (
-                              <span>• Assist: {goal.assistPlayerName}</span>
-                            )}
                             {goal.minute !== null && <span>• {goal.minute}'</span>}
                           </div>
                         </div>
@@ -664,6 +699,116 @@ const AdminBracket = () => {
                       </div>
                     ))
                   )}
+                </div>
+
+                <div className="space-y-4 border-t border-black/10 pt-4">
+                  <p className="text-xs uppercase tracking-[0.3em] text-black/50">Assists</p>
+
+                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                    Assisting Team
+                    <select
+                      value={assistForm.assistingTeamId}
+                      onChange={(event) =>
+                        setAssistForm((prev) => ({
+                          ...prev,
+                          assistingTeamId: event.target.value,
+                          assistingPlayerId: ""
+                        }))
+                      }
+                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                    >
+                      <option value="">Select team</option>
+                      {selectedMatch?.teamA?.id && (
+                        <option value={selectedMatch.teamA.id}>
+                          {selectedMatch.teamA.name}
+                        </option>
+                      )}
+                      {selectedMatch?.teamB?.id && (
+                        <option value={selectedMatch.teamB.id}>
+                          {selectedMatch.teamB.name}
+                        </option>
+                      )}
+                    </select>
+                  </label>
+
+                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                    Assisting Player
+                    <select
+                      value={assistForm.assistingPlayerId}
+                      onChange={(event) =>
+                        setAssistForm((prev) => ({
+                          ...prev,
+                          assistingPlayerId: event.target.value
+                        }))
+                      }
+                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                    >
+                      <option value="">Select player</option>
+                      {(assistForm.assistingTeamId
+                        ? teamById[assistForm.assistingTeamId]?.members ?? []
+                        : []).map((player) => (
+                        <option key={player.id} value={player.id}>
+                          {player.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                    Minute
+                    <input
+                      type="number"
+                      min={0}
+                      value={assistForm.minute}
+                      onChange={(event) =>
+                        setAssistForm((prev) => ({
+                          ...prev,
+                          minute: event.target.value
+                        }))
+                      }
+                      className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleAddAssist}
+                    className="w-full border border-black bg-black px-4 py-2 text-xs uppercase tracking-[0.3em] text-white"
+                  >
+                    Add Assist
+                  </button>
+
+                  <div className="space-y-3 border-t border-black/10 pt-4">
+                    {assists.length === 0 ? (
+                      <p className="text-sm text-black/60">No assists logged yet.</p>
+                    ) : (
+                      assists.map((assist) => (
+                        <div key={assist.id} className="flex items-center justify-between gap-3">
+                          <div className="text-sm">
+                            <p className="font-semibold text-black">
+                              {assist.assistingPlayerName ?? "Player"}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-black/60">
+                              <span>
+                                {teamById[assist.assistingTeamId]?.name ?? "Team"}
+                              </span>
+                              <TeamColorBadge
+                                color={teamColorsById[assist.assistingTeamId] ?? null}
+                              />
+                              {assist.minute !== null && <span>• {assist.minute}'</span>}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAssist(assist.id)}
+                            className="border border-black/30 px-3 py-1 text-[0.65rem] uppercase tracking-[0.2em] text-black"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
