@@ -34,6 +34,8 @@ type MatchGoal = {
   scoringTeamName: string;
   scoringPlayerId: string;
   scoringPlayerName: string;
+  assistPlayerId?: string | null;
+  assistPlayerName?: string | null;
   minute: number | null;
   createdAt: string;
 };
@@ -83,6 +85,8 @@ const Stats = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [selectedTournament, setSelectedTournament] = useState<string>("");
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<"leaderboard" | "matches">("leaderboard");
+  const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({});
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   const [loadingStats, setLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +120,7 @@ const Stats = () => {
     let active = true;
     if (!selectedTournament) {
       setStats(null);
+      setExpandedMatches({});
       return;
     }
 
@@ -127,6 +132,7 @@ const Stats = () => {
       .then((data) => {
         if (!active) return;
         setStats(data);
+        setExpandedMatches({});
       })
       .catch(() => {
         if (!active) return;
@@ -208,72 +214,127 @@ const Stats = () => {
         </div>
       )}
 
+      {stats && (
+        <div className="flex flex-wrap items-center gap-2 border border-black/10 bg-white p-2 text-xs uppercase tracking-[0.2em] shadow-card">
+          <button
+            type="button"
+            onClick={() => setActiveTab("leaderboard")}
+            className={`rounded-full px-4 py-2 transition ${
+              activeTab === "leaderboard"
+                ? "bg-black text-white"
+                : "text-black/60 hover:text-black"
+            }`}
+          >
+            Leaderboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("matches")}
+            className={`rounded-full px-4 py-2 transition ${
+              activeTab === "matches"
+                ? "bg-black text-white"
+                : "text-black/60 hover:text-black"
+            }`}
+          >
+            Matches
+          </button>
+        </div>
+      )}
+
       {loadingStats && (
         <p className="text-xs uppercase tracking-[0.2em] text-black/50">Loading stats...</p>
       )}
 
-      {stats && (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)]">
-          <div className="border border-black/10 bg-white p-6 shadow-card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-black/50">
-                  Leaderboard
-                </p>
-                <h2 className="mt-2 text-xl font-semibold tracking-tight">
-                  Goals & Goals Per Game
-                </h2>
-              </div>
-              <span className="text-xs uppercase tracking-[0.2em] text-black/50">
-                {stats.leaderboard.length} players
-              </span>
+      {stats && activeTab === "leaderboard" && (
+        <div className="border border-black/10 bg-white p-6 shadow-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-black/50">Leaderboard</p>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight">
+                Goals & Goals Per Game
+              </h2>
             </div>
-            <div className="mt-6 space-y-3">
-              {stats.leaderboard.map((player, index) => (
-                <div
-                  key={player.playerId}
-                  className="flex items-center justify-between gap-3 border border-black/10 px-4 py-3 text-sm"
-                >
-                  <div>
-                    <p className="text-sm font-semibold tracking-tight">
-                      {index + 1}. {player.playerName}
-                    </p>
-                    <p className="text-xs uppercase tracking-[0.2em] text-black/50">
-                      {player.teamName}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-6 text-right">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-black/50">Goals</p>
-                      <p className="text-base font-semibold">{player.goals}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-black/50">
-                        Goals/Game
-                      </p>
-                      <p className="text-base font-semibold">
-                        {formatGoalsPerGame(player.goalsPerGame)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {stats.leaderboard.length === 0 && (
-                <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
-                  No players or goals logged for this tournament yet.
-                </div>
-              )}
-            </div>
+            <span className="text-xs uppercase tracking-[0.2em] text-black/50">
+              {stats.leaderboard.length} players
+            </span>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-black/50">Matches</p>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight">Per-match stats</h2>
+          <div className="mt-6 space-y-3">
+            <div className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)] md:gap-3 md:border-b md:border-black/10 md:pb-2">
+              <span>Player</span>
+              <span>Team</span>
+              <span>Goals</span>
+              <span>Matches</span>
+              <span>Goals/Game</span>
             </div>
-            {stats.matches.map((match) => (
+            {stats.leaderboard.map((player, index) => (
+              <div
+                key={player.playerId}
+                className="grid gap-2 border border-black/10 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.6fr)_minmax(0,0.8fr)_minmax(0,0.9fr)] md:items-center"
+              >
+                <div>
+                  <p className="text-sm font-semibold tracking-tight">
+                    {index + 1}. {player.playerName}
+                  </p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                    {player.teamName}
+                  </p>
+                </div>
+                <p className="hidden text-xs uppercase tracking-[0.2em] text-black/50 md:block">
+                  {player.teamName}
+                </p>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                    Goals
+                  </p>
+                  <p className="text-base font-semibold">{player.goals}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                    Matches
+                  </p>
+                  <p className="text-base font-semibold">{player.matchesPlayed}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-black/50 md:hidden">
+                    Goals/Game
+                  </p>
+                  <p className="text-base font-semibold">
+                    {formatGoalsPerGame(player.goalsPerGame)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {stats.leaderboard.length === 0 && (
+              <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
+                No players or goals logged for this tournament yet.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {stats && activeTab === "matches" && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-black/50">Matches</p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight">Per-match stats</h2>
+          </div>
+          {stats.matches.map((match) => {
+            const isExpanded = expandedMatches[match.id] ?? false;
+            return (
               <div key={match.id} className="border border-black/10 bg-white p-6 shadow-card">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedMatches((prev) => ({
+                      ...prev,
+                      [match.id]: !prev[match.id]
+                    }))
+                  }
+                  className="flex w-full flex-col gap-4 text-left md:flex-row md:items-center md:justify-between"
+                  aria-expanded={isExpanded}
+                >
                   <div>
                     <p className="text-xs uppercase tracking-[0.2em] text-black/50">
                       {matchTypeLabel[match.matchType]}
@@ -283,6 +344,9 @@ const Stats = () => {
                       <span className="text-black/40">vs</span>{" "}
                       {match.teamB?.name ?? "TBD"}
                     </h3>
+                    <p className="mt-2 text-xs uppercase tracking-[0.2em] text-black/50">
+                      {match.goals.length} goals logged
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span
@@ -295,39 +359,49 @@ const Stats = () => {
                     <span className="text-lg font-semibold tracking-tight">
                       {match.scoreA} - {match.scoreB}
                     </span>
+                    <span className="text-xs uppercase tracking-[0.2em] text-black/50">
+                      {isExpanded ? "Hide" : "Show"}
+                    </span>
                   </div>
-                </div>
-                <div className="mt-5 space-y-2">
-                  {match.goals.map((goal) => (
-                    <div
-                      key={goal.id}
-                      className="flex flex-col gap-2 border border-black/10 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <p className="font-semibold">{goal.scoringPlayerName}</p>
-                        <p className="text-xs uppercase tracking-[0.2em] text-black/50">
-                          {goal.scoringTeamName}
-                        </p>
+                </button>
+                {isExpanded && (
+                  <div className="mt-5 space-y-2">
+                    {match.goals.map((goal) => (
+                      <div
+                        key={goal.id}
+                        className="flex flex-col gap-2 border border-black/10 px-4 py-3 text-sm md:flex-row md:items-center md:justify-between"
+                      >
+                        <div>
+                          <p className="font-semibold">{goal.scoringPlayerName}</p>
+                          <p className="text-xs uppercase tracking-[0.2em] text-black/50">
+                            {goal.scoringTeamName}
+                          </p>
+                          {goal.assistPlayerName && (
+                            <p className="text-xs uppercase tracking-[0.2em] text-black/40">
+                              Assist: {goal.assistPlayerName}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs uppercase tracking-[0.2em] text-black/50">
+                          {goal.minute !== null ? `${goal.minute}'` : "Minute N/A"}
+                        </span>
                       </div>
-                      <span className="text-xs uppercase tracking-[0.2em] text-black/50">
-                        {goal.minute !== null ? `${goal.minute}'` : "Minute N/A"}
-                      </span>
-                    </div>
-                  ))}
-                  {match.goals.length === 0 && (
-                    <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
-                      No goals logged for this match yet.
-                    </div>
-                  )}
-                </div>
+                    ))}
+                    {match.goals.length === 0 && (
+                      <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
+                        No goals logged for this match yet.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
-            {stats.matches.length === 0 && (
-              <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
-                No matches scheduled for this tournament yet.
-              </div>
-            )}
-          </div>
+            );
+          })}
+          {stats.matches.length === 0 && (
+            <div className="border border-dashed border-black/20 px-4 py-4 text-sm text-black/60">
+              No matches scheduled for this tournament yet.
+            </div>
+          )}
         </div>
       )}
     </section>

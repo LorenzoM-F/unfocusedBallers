@@ -54,6 +54,7 @@ type MatchUpdateForm = {
 type GoalForm = {
   scoringTeamId: string;
   scoringPlayerId: string;
+  assistPlayerId: string;
   minute: string;
 };
 
@@ -284,12 +285,18 @@ const Bracket = () => {
       await api.post(`/admin/matches/${match.id}/goals`, {
         scoringTeamId: form.scoringTeamId,
         scoringPlayerId: form.scoringPlayerId,
+        assistPlayerId: form.assistPlayerId || undefined,
         minute: form.minute ? Number(form.minute) : undefined,
       });
 
       setGoalForms((prev) => ({
         ...prev,
-        [match.id]: { scoringTeamId: form.scoringTeamId, scoringPlayerId: "", minute: "" },
+        [match.id]: {
+          scoringTeamId: form.scoringTeamId,
+          scoringPlayerId: "",
+          assistPlayerId: "",
+          minute: ""
+        },
       }));
     } catch {
       setActionError("We couldn't add the goal. Please try again.");
@@ -567,7 +574,17 @@ const Bracket = () => {
                       Scoring Team
                       <select
                         value={goalForms[selectedMatch.id]?.scoringTeamId ?? ""}
-                        onChange={(e) => handleGoalChange(selectedMatch.id, "scoringTeamId", e.target.value)}
+                        onChange={(e) =>
+                          setGoalForms((prev) => ({
+                            ...prev,
+                            [selectedMatch.id]: {
+                              ...prev[selectedMatch.id],
+                              scoringTeamId: e.target.value,
+                              scoringPlayerId: "",
+                              assistPlayerId: ""
+                            }
+                          }))
+                        }
                         className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
                       >
                         <option value="">Select team</option>
@@ -588,6 +605,26 @@ const Bracket = () => {
                         className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
                       >
                         <option value="">Select player</option>
+                        {(
+                          goalForms[selectedMatch.id]?.scoringTeamId
+                            ? teamMembersById[goalForms[selectedMatch.id].scoringTeamId] || []
+                            : []
+                        ).map((player) => (
+                          <option key={player.id} value={player.id}>
+                            {player.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-xs uppercase tracking-[0.2em] text-black/50">
+                      Assist Player
+                      <select
+                        value={goalForms[selectedMatch.id]?.assistPlayerId ?? ""}
+                        onChange={(e) => handleGoalChange(selectedMatch.id, "assistPlayerId", e.target.value)}
+                        className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                      >
+                        <option value="">No assist</option>
                         {(
                           goalForms[selectedMatch.id]?.scoringTeamId
                             ? teamMembersById[goalForms[selectedMatch.id].scoringTeamId] || []

@@ -44,6 +44,8 @@ type Goal = {
   scoringTeamId: string;
   scoringPlayerId: string;
   scoringPlayerName?: string;
+  assistPlayerId?: string | null;
+  assistPlayerName?: string | null;
   minute: number | null;
   createdAt?: string;
 };
@@ -57,6 +59,7 @@ type MatchForm = {
 type GoalForm = {
   scoringTeamId: string;
   scoringPlayerId: string;
+  assistPlayerId: string;
   minute: string;
 };
 
@@ -74,6 +77,7 @@ const AdminBracket = () => {
   const [goalForm, setGoalForm] = useState<GoalForm>({
     scoringTeamId: "",
     scoringPlayerId: "",
+    assistPlayerId: "",
     minute: ""
   });
   const [loading, setLoading] = useState(true);
@@ -296,9 +300,15 @@ const AdminBracket = () => {
       await api.post(`/admin/matches/${selectedMatchId}/goals`, {
         scoringTeamId: goalForm.scoringTeamId,
         scoringPlayerId: goalForm.scoringPlayerId,
+        assistPlayerId: goalForm.assistPlayerId || undefined,
         minute: goalForm.minute ? Number(goalForm.minute) : undefined
       });
-      setGoalForm({ scoringTeamId: goalForm.scoringTeamId, scoringPlayerId: "", minute: "" });
+      setGoalForm({
+        scoringTeamId: goalForm.scoringTeamId,
+        scoringPlayerId: "",
+        assistPlayerId: "",
+        minute: ""
+      });
       await Promise.all([
         refreshGoals(selectedMatchId),
         refreshBracket(selectedTournamentId)
@@ -533,7 +543,8 @@ const AdminBracket = () => {
                       setGoalForm((prev) => ({
                         ...prev,
                         scoringTeamId: event.target.value,
-                        scoringPlayerId: ""
+                        scoringPlayerId: "",
+                        assistPlayerId: ""
                       }))
                     }
                     className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
@@ -565,6 +576,29 @@ const AdminBracket = () => {
                     className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
                   >
                     <option value="">Select player</option>
+                    {(goalForm.scoringTeamId
+                      ? teamById[goalForm.scoringTeamId]?.members ?? []
+                      : []).map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block text-xs uppercase tracking-[0.2em] text-black/50">
+                  Assist Player
+                  <select
+                    value={goalForm.assistPlayerId}
+                    onChange={(event) =>
+                      setGoalForm((prev) => ({
+                        ...prev,
+                        assistPlayerId: event.target.value
+                      }))
+                    }
+                    className="mt-2 w-full border border-black/10 px-3 py-2 text-sm"
+                  >
+                    <option value="">No assist</option>
                     {(goalForm.scoringTeamId
                       ? teamById[goalForm.scoringTeamId]?.members ?? []
                       : []).map((player) => (
@@ -614,6 +648,9 @@ const AdminBracket = () => {
                             <TeamColorBadge
                               color={teamColorsById[goal.scoringTeamId] ?? null}
                             />
+                            {goal.assistPlayerName && (
+                              <span>• Assist: {goal.assistPlayerName}</span>
+                            )}
                             {goal.minute !== null && <span>• {goal.minute}'</span>}
                           </div>
                         </div>
